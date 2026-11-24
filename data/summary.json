@@ -1,0 +1,79 @@
+{
+  "repos_mined": 289,
+  "repos_failed": {
+    "TimeoutExpired": 4,
+    "ValueError": 6,
+    "GitError": 5
+  },
+  "same_base_groups_ge5": 982,
+  "same_base_groups_with_any_conflict": 265,
+  "instances_conflict_component_ge_k": 72,
+  "instances_repos": 51,
+  "k": {
+    "n": 72,
+    "min": 5,
+    "p25": 5,
+    "median": 6,
+    "p75": 12,
+    "max": 38,
+    "mean": 9.82
+  },
+  "conflict_hunks": {
+    "n": 72,
+    "min": 4,
+    "p25": 10,
+    "median": 25,
+    "p75": 71,
+    "max": 5425,
+    "mean": 150.15
+  },
+  "conflict_pairs": {
+    "n": 72,
+    "min": 4,
+    "p25": 7,
+    "median": 11,
+    "p75": 36,
+    "max": 259,
+    "mean": 30.06
+  },
+  "conflict_files": {
+    "n": 72,
+    "min": 1,
+    "p25": 1,
+    "median": 3,
+    "p75": 6,
+    "max": 24,
+    "mean": 4.89
+  },
+  "agents": {
+    "OpenAI_Codex": 206,
+    "Claude_Code": 137,
+    "Copilot": 259,
+    "Devin": 49,
+    "Cursor": 46,
+    "Google_Jules": 10
+  },
+  "multi_agent_instances": 1,
+  "languages": {
+    "TypeScript": 17,
+    "Python": 14,
+    "Go": 10,
+    "C#": 9,
+    "Java": 4,
+    "JavaScript": 3,
+    "PowerShell": 2,
+    "Rust": 2,
+    "HCL": 2,
+    "Swift": 2,
+    "Dart": 1,
+    "GDScript": 1
+  },
+  "gold_all_landed": 47,
+  "k_ge": {
+    "5": 72,
+    "8": 29,
+    "10": 24,
+    "15": 10,
+    "20": 6
+  }
+}
