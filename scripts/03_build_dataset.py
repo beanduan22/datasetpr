@@ -62,6 +62,63 @@ def filter_pairs(pairs: list[dict], code_only: bool) -> list[dict]:
     return out
 
 
+def load_landing_api() -> dict[tuple[str, int], dict]:
+    """(repo, pr) -> API row from 05_fill_landing.py, with target_is_default resolved."""
+    f, fd = ROOT / "data" / "landing_api.jsonl", ROOT / "data" / "default_branch.json"
+    if not f.exists() or not fd.exists():
+        raise SystemExit("run scripts/05_fill_landing.py first (landing_api.jsonl + default_branch.json)")
+    default = json.loads(fd.read_text())
+    out = {}
+    for r in map(json.loads, f.open()):
+        if r.get("merged"):
+            out[(r["repo"], r["pr"])] = {**r, "target_is_default": r["base_ref"] == default.get(r["repo"])}
+    return out
+
+
+def apply_landing_api(repo: dict, group: dict, api: dict) -> dict:
+    """Fill landing only for PRs merged into the default branch; record each PR's target branch.
+
+    PRs merged into another branch got their fork point from the default branch at merge time
+    (02 fallback), so their "same base" is unreliable -> they keep landing = None.
+    """
+    prs = []
+    for p in group["prs"]:
+        if p["landing"]:  # found on default-branch first-parent history
+            prs.append({**p, "landing_source": "local", "target_branch": "<default>"})
+            continue
+        r = api.get((repo["full_name"], p["number"]))
+        if r is None:
+            prs.append({**p, "landing_source": None, "target_branch": None})
+        elif r["target_is_default"]:
+            prs.append({**p, "landing": r["merge_commit_sha"], "landing_source": "github_api",
+                        "target_branch": "<default>"})
+        else:
+            prs.append({**p, "landing_source": None, "target_branch": r["base_ref"]})
+    return {**group, "prs": prs}
+
+
+def load_test_info() -> dict[tuple[str, str, int], list[str]]:
+    """(repo, base_commit, pr_number) -> test files changed by that PR (from 04_test_filter)."""
+    info = {}
+    for f in (ROOT / "data" / "test_filter").glob("*.json"):
+        d = json.loads(f.read_text())
+        for g in d.get("groups", []):
+            for p in g["prs"]:
+                if p["files_ok"]:
+                    info[(d["full_name"], g["base"], p["number"])] = p["test_files"]
+    return info
+
+
+def add_test_fields(inst: dict, test_info: dict) -> dict:
+    branches = []
+    for b in inst["branches"]:
+        tf = test_info.get((inst["repo"], inst["base_commit"], b["pr_number"]))
+        branches.append({**b, "test_files": tf, "touches_tests": None if tf is None else bool(tf)})
+    n = sum(bool(b["touches_tests"]) for b in branches)
+    return {**inst, "branches": branches, "n_branches_with_tests": n,
+            "all_branches_touch_tests": n == len(branches)}
+
+
 def build_instance(repo: dict, group: dict, comp: set, kept_pairs: list[dict]) -> dict:
     prs = sorted((p for p in group["prs"] if p["number"] in comp), key=lambda p: p["merged_at"])
     pairs = [p for p in kept_pairs if p["a"] in comp and p["b"] in comp]
@@ -87,6 +144,8 @@ def build_instance(repo: dict, group: dict, comp: set, kept_pairs: list[dict]) -
                 "n_commits": p["n_commits"],
                 "sync_merges": p["sync_merges"],
                 "landing_commit": p["landing"],
+                "landing_source": p.get("landing_source", "local" if p["landing"] else None),
+                "target_branch": p.get("target_branch"),
             }
             for p in prs
         ],
@@ -100,6 +159,7 @@ def build_instance(repo: dict, group: dict, comp: set, kept_pairs: list[dict]) -
         "conflict_files": files,
         "gold_final_commit": prs[-1]["landing"] or prs[-1]["before_merge"],
         "gold_all_landed": all(p["landing"] for p in prs),
+        "all_target_default": all(p.get("target_branch") == "<default>" for p in prs),
     }
 
 
@@ -117,6 +177,10 @@ def main() -> None:
     ap.add_argument("--min-k", type=int, default=5)
     ap.add_argument("--code-only", action="store_true", help="only count conflicts in source files")
     ap.add_argument("--out", default="dataset.jsonl")
+    ap.add_argument("--tests", action="store_true",
+                    help="annotate branches with test files from data/test_filter (run 04 first)")
+    ap.add_argument("--landing-api", action="store_true",
+                    help="fill missing landing commits from data/landing_api.jsonl (run 05 first)")
     args = ap.parse_args()
 
     repos, errors = [], Counter()
@@ -128,15 +192,20 @@ def main() -> None:
         repos.append(r)
 
     same_base_groups = [g for r in repos for g in r["groups"]]
+    api = load_landing_api() if args.landing_api else {}
     instances = []
     for r in repos:
         for g in r["groups"]:
+            g = apply_landing_api(r, g, api) if api else g
             kept = filter_pairs(g["pairs"], args.code_only)
             members = [p["number"] for p in g["prs"]]
             for comp in conflict_components(members, kept):
                 if len(comp) >= args.min_k:
                     instances.append(build_instance(r, g, set(comp), kept))
     instances.sort(key=lambda x: (-x["k"], -x["n_conflict_hunks"]))
+    if args.tests:
+        test_info = load_test_info()
+        instances = [add_test_fields(x, test_info) for x in instances]
 
     with open(ROOT / "data" / args.out, "w") as f:
         for x in instances:
@@ -157,8 +226,26 @@ def main() -> None:
         "multi_agent_instances": sum(len(x["agents"]) > 1 for x in instances),
         "languages": dict(Counter(x["language"] for x in instances).most_common(12)),
         "gold_all_landed": sum(x["gold_all_landed"] for x in instances),
-        "k_ge": {k: sum(x["k"] >= k for x in instances) for k in (5, 8, 10, 15, 20)},
+        "k_ge": {k: sum(x["k"] >= k for x in instances) for k in (5, 8, 9, 10, 15, 20)},
     }
+    if args.landing_api:
+        ok = [x for x in instances if x["gold_all_landed"] and x["all_target_default"]]
+        summary["all_target_default"] = sum(x["all_target_default"] for x in instances)
+        summary["reliable_gold"] = {
+            "instances": len(ok), "repos": len({x["repo"] for x in ok}),
+            "k_ge": {k: sum(x["k"] >= k for x in ok) for k in (9, 10, 15, 20)},
+            "every_pr_touches_tests": sum(x.get("all_branches_touch_tests", False) for x in ok),
+            "every_pr_touches_tests_k_ge_10": sum(
+                x.get("all_branches_touch_tests", False) and x["k"] >= 10 for x in ok),
+            "languages": dict(Counter(x["language"] for x in ok).most_common(12))}
+    if args.tests:
+        tested = [x for x in instances if x["all_branches_touch_tests"]]
+        summary["missing_test_info_branches"] = sum(
+            b["touches_tests"] is None for x in instances for b in x["branches"])
+        summary["all_branches_touch_tests"] = {
+            "instances": len(tested), "repos": len({x["repo"] for x in tested}),
+            "k_ge": {k: sum(x["k"] >= k for x in tested) for k in (9, 10, 15, 20)},
+            "languages": dict(Counter(x["language"] for x in tested).most_common(12))}
     (ROOT / "data" / args.out.replace("dataset", "summary").replace(".jsonl", ".json")).write_text(json.dumps(summary, indent=2))
     print(json.dumps(summary, indent=2))
 

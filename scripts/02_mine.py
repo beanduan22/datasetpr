@@ -88,7 +88,9 @@ def fetch_pr_heads(repo: Path, numbers: list[int]) -> None:
 def resolve_refs(repo: Path, numbers: list[int]) -> dict[int, str]:
     _, out = git(repo, "for-each-ref", "--format=%(refname) %(objectname)", "refs/pr/")
     heads = {}
-    for line in out.split("\n"):
+    for line in out.splitlines():
+        if not line.strip():
+            continue
         ref, sha = line.split()
         heads[int(ref.rsplit("/", 1)[1])] = sha
     return {n: heads[n] for n in numbers if n in heads}
@@ -316,7 +318,13 @@ def main() -> None:
     OUT.mkdir(parents=True, exist_ok=True)
     cands = [json.loads(l) for l in open(args.candidates)]
     cands = [c for c in cands if c["n_merged"] <= args.max_prs][args.start:args.start + args.limit]
-    todo = [c for c in cands if not (OUT / (c["full_name"].replace("/", "__") + ".json")).exists()]
+    def done(c: dict) -> bool:  # cached result; failed ones are retried unless they are clone failures
+        f = OUT / (c["full_name"].replace("/", "__") + ".json")
+        if not f.exists():
+            return False
+        err = json.loads(f.read_text()).get("error", "")
+        return not err or "clone failed" in err
+    todo = [c for c in cands if not done(c)]
     print(f"{len(todo)} repos to mine ({len(cands) - len(todo)} cached)", flush=True)
     with ProcessPoolExecutor(args.workers) as ex:
         futs = [ex.submit(worker, c, args.min_group, args.max_group, args.clone_timeout) for c in todo]

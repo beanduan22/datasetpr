@@ -28,16 +28,23 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--min-conc", type=int, default=5)
     ap.add_argument("--out", default=str(ROOT / "data" / "candidates.jsonl"))
+    ap.add_argument("--table", choices=["curated", "all"], default="curated",
+                    help="curated = pull_request.parquet, all = all_pull_request.parquet")
+    ap.add_argument("--exclude", nargs="*", default=[], help="candidate files whose repos are skipped")
     args = ap.parse_args()
+    prefix = "all_" if args.table == "all" else ""
+    skip = {json.loads(l)["repo_id"] for f in args.exclude for l in open(f)}
 
     cols = ["id", "number", "agent", "created_at", "merged_at", "repo_id", "html_url", "title"]
-    pr = pd.read_parquet(AIDEV / "pull_request.parquet", columns=cols)
-    pr = pr[pr.merged_at.notna()].copy()
-    pr["c"] = pd.to_datetime(pr.created_at)
-    pr["m"] = pd.to_datetime(pr.merged_at)
+    pr = pd.read_parquet(AIDEV / f"{prefix}pull_request.parquet", columns=cols)
+    pr = pr[pr.merged_at.notna() & ~pr.repo_id.isin(skip)].copy()
+    counts = pr.groupby("repo_id").size()
+    pr = pr[pr.repo_id.isin(counts[counts >= args.min_conc].index)]
+    pr["c"] = pd.to_datetime(pr.created_at, utc=True)
+    pr["m"] = pd.to_datetime(pr.merged_at, utc=True)
     pr["full_name"] = pr.html_url.str.extract(r"github\.com/([^/]+/[^/]+)/pull/")[0]
 
-    repo = pd.read_parquet(AIDEV / "repository.parquet", columns=["id", "stars", "language"])
+    repo = pd.read_parquet(AIDEV / f"{prefix}repository.parquet", columns=["id", "stars", "language"])
     repo = repo.rename(columns={"id": "repo_id"})
 
     rows = []

@@ -1,0 +1,132 @@
+{
+  "repos_mined": 4245,
+  "repos_failed": {
+    "GitError": 583,
+    "TimeoutExpired": 19,
+    "ValueError": 20
+  },
+  "same_base_groups_ge5": 14524,
+  "same_base_groups_with_any_conflict": 6639,
+  "instances_conflict_component_ge_k": 835,
+  "instances_repos": 506,
+  "k": {
+    "n": 835,
+    "min": 9,
+    "p25": 10,
+    "median": 12,
+    "p75": 17,
+    "max": 40,
+    "mean": 15.07
+  },
+  "conflict_hunks": {
+    "n": 835,
+    "min": 8,
+    "p25": 48,
+    "median": 97,
+    "p75": 274,
+    "max": 201816,
+    "mean": 785.26
+  },
+  "conflict_pairs": {
+    "n": 835,
+    "min": 8,
+    "p25": 23,
+    "median": 36,
+    "p75": 67,
+    "max": 778,
+    "mean": 76.3
+  },
+  "conflict_files": {
+    "n": 835,
+    "min": 1,
+    "p25": 3,
+    "median": 7,
+    "p75": 13,
+    "max": 3286,
+    "mean": 15.34
+  },
+  "agents": {
+    "OpenAI_Codex": 7056,
+    "Claude_Code": 1492,
+    "Copilot": 3102,
+    "Google_Jules": 721,
+    "Cursor": 131,
+    "Devin": 81
+  },
+  "multi_agent_instances": 27,
+  "languages": {
+    "Python": 256,
+    "TypeScript": 173,
+    "JavaScript": 103,
+    "Kotlin": 44,
+    "Go": 39,
+    "Rust": 35,
+    "PHP": 27,
+    "C": 23,
+    "C#": 23,
+    "HTML": 22,
+    "Java": 17,
+    "C++": 16
+  },
+  "gold_all_landed": 642,
+  "k_ge": {
+    "5": 835,
+    "8": 835,
+    "9": 835,
+    "10": 662,
+    "15": 280,
+    "20": 158
+  },
+  "all_target_default": 642,
+  "reliable_gold": {
+    "instances": 642,
+    "repos": 413,
+    "k_ge": {
+      "9": 642,
+      "10": 495,
+      "15": 190,
+      "20": 97
+    },
+    "every_pr_touches_tests": 96,
+    "every_pr_touches_tests_k_ge_10": 68,
+    "languages": {
+      "Python": 168,
+      "TypeScript": 134,
+      "JavaScript": 96,
+      "Kotlin": 40,
+      "Rust": 30,
+      "Go": 28,
+      "PHP": 27,
+      "C": 22,
+      "HTML": 16,
+      "Java": 14,
+      "C++": 14,
+      "Dart": 14
+    }
+  },
+  "missing_test_info_branches": 0,
+  "all_branches_touch_tests": {
+    "instances": 215,
+    "repos": 134,
+    "k_ge": {
+      "9": 215,
+      "10": 166,
+      "15": 84,
+      "20": 52
+    },
+    "languages": {
+      "Python": 92,
+      "TypeScript": 50,
+      "Go": 11,
+      "Rust": 10,
+      "C#": 9,
+      "JavaScript": 8,
+      "C++": 6,
+      "Kotlin": 4,
+      "Dart": 4,
+      "C": 3,
+      "Ruby": 3,
+      "Java": 2
+    }
+  }
+}
